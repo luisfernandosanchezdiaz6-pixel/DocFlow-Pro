@@ -272,7 +272,13 @@ const SUPABASE_URL = 'https://xmqgbwcekbwmroibllkk.supabase.co'; // Supabase > P
 const SUPABASE_ANON_KEY = 'sb_publishable_LywloH-MTKGu9_uTSUt6EA_SBabouPj'; // Clave publishable (pública, segura para el navegador)
 const FREE_LIMIT = 3; // PDFs gratis por cuenta (debe coincidir con supabase.sql)
 /* ===================================================================== */
-const sb=(window.supabase&&!SUPABASE_URL.startsWith('PEGAR_AQUI'))?supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+// Algunos navegadores (Edge/Safari con prevención de rastreo) bloquean el storage del script del CDN: guardamos la sesión desde nuestro propio código, con respaldo en memoria
+const MEM={};
+const SAFE_STORE={
+  getItem:k=>{let v=null;try{v=localStorage.getItem(k)}catch(e){}return v!==null?v:(k in MEM?MEM[k]:null)},
+  setItem:(k,v)=>{MEM[k]=v;try{localStorage.setItem(k,v)}catch(e){}},
+  removeItem:k=>{delete MEM[k];try{localStorage.removeItem(k)}catch(e){}}};
+const sb=(window.supabase&&!SUPABASE_URL.startsWith('PEGAR_AQUI'))?supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY,{auth:{storage:SAFE_STORE}}):null;
 let SES=null;
 const session=async()=>sb?(await sb.auth.getSession()).data.session:null;
 async function refresh(){
@@ -280,7 +286,7 @@ async function refresh(){
   $$('.pp-custom').forEach(i=>i.value=SES?SES.user.id:'');
   $('#authBtn').textContent=SES?'Salir':'Iniciar sesión';
   if(!SES){a.textContent='';return}
-  const {data:p}=await sb.from('profiles').select('plan,plan_expires_at,free_used,extra_credits').single();
+  let p=null;try{p=(await sb.from('profiles').select('plan,plan_expires_at,free_used,extra_credits').single()).data}catch(e){}
   if(!p){a.textContent=SES.user.email;return}
   const act=p.plan!=='free'&&new Date(p.plan_expires_at)>new Date();
   a.textContent=SES.user.email+' · '+(act?`Plan ${p.plan==='pro'?'Pro':'Básico'} hasta ${new Date(p.plan_expires_at).toLocaleDateString('es-CO')}`:`${Math.max(0,FREE_LIMIT-p.free_used)} de ${FREE_LIMIT} PDFs gratis`+(p.extra_credits?` · ${p.extra_credits} extra`:''));
@@ -289,19 +295,22 @@ async function refresh(){
 async function gate(){
   if(!sb){alert('Falta configurar Supabase al inicio del script.');return false}
   const s=await session();
-  if(!s){$('#auth').showModal();return false}
+  if(!s){$('#aMsg').textContent='Inicia sesión o crea tu cuenta para generar documentos.';$('#auth').showModal();return false}
   let r;try{r=await fetch('/.netlify/functions/consume',{method:'POST',headers:{Authorization:'Bearer '+s.access_token}})}catch(e){alert('No hay conexión con el servidor.');return false}
   if(r.ok){refresh();return true}
   if(r.status===402){$('#limit').showModal();return false}
   if(r.status===401){$('#auth').showModal();return false}
   alert('No se pudo verificar tu cuenta. Inténtalo de nuevo.');return false}
 const doAuth=async up=>{const m=$('#aMsg'),e=$('#aMail').value.trim(),p=$('#aPass').value;
-  if(!sb){m.textContent='Falta configurar Supabase al inicio del script.';return}
+  if(!sb){m.textContent=window.supabase?'Falta configurar Supabase al inicio del script.':'No se cargó la librería de cuentas. Revisa tu conexión, desactiva bloqueadores para este sitio y recarga la página.';return}
   if(!e||p.length<6){m.textContent='Escribe un correo y una contraseña de mínimo 6 caracteres.';return}
-  const r=up?await sb.auth.signUp({email:e,password:p}):await sb.auth.signInWithPassword({email:e,password:p});
-  if(r.error){m.textContent=r.error.message;return}
+  m.textContent='Procesando…';
+  let r;try{r=await Promise.race([up?sb.auth.signUp({email:e,password:p}):sb.auth.signInWithPassword({email:e,password:p}),new Promise((_,no)=>setTimeout(()=>no(new Error('timeout')),15000))])}
+  catch(err){m.textContent='No se pudo conectar con el servidor (tardó demasiado). Revisa tu internet e inténtalo de nuevo.';return}
+  if(r.error){const em=r.error.message||'';
+    m.textContent=/rate limit|too many|seconds/i.test(em)?'Demasiados intentos. Espera unos minutos e inténtalo de nuevo.':/not confirmed/i.test(em)?'Aún no confirmaste tu correo. Revisa tu bandeja de entrada.':/invalid login/i.test(em)?'Correo o contraseña incorrectos, o aún no confirmaste tu correo.':em;return}
   if(up&&!r.data.session){m.textContent='Cuenta creada. Confirma tu correo y luego inicia sesión.';return}
-  m.textContent='';$('#auth').close()};
+  await refresh();m.textContent='';$('#auth').close()};
 $('#aIn').onclick=()=>doAuth(false);$('#aUp').onclick=()=>doAuth(true);
 $('#authBtn').onclick=async()=>{if(!sb){alert('Falta configurar Supabase al inicio del script.');return}if(SES)await sb.auth.signOut();else $('#auth').showModal()};
 $('#limRef').onclick=async()=>{await refresh();$('#limit').close()};
@@ -309,7 +318,7 @@ $$('[data-wompi]').forEach(a=>a.addEventListener('click',e=>{
   if(!SES){e.preventDefault();$('#auth').showModal();return}
   if(!confirm(`Al pagar en Wompi usa este mismo correo: ${SES.user.email}. Si usas otro, tu pago no se activará automáticamente.`))e.preventDefault()}));
 $$('#precios form').forEach(f=>f.addEventListener('submit',e=>{if(!SES){e.preventDefault();$('#auth').showModal()}}));
-if(sb)sb.auth.onAuthStateChange(()=>refresh());
+if(sb)sb.auth.onAuthStateChange(()=>{setTimeout(refresh,0)}); // diferido: llamar a Supabase dentro de este callback puede dejarlo colgado
 refresh();
 
 
