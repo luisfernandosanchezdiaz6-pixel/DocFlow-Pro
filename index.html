@@ -300,7 +300,8 @@ async function gate(){
   if(r.ok){refresh();return true}
   if(r.status===402){$('#limit').showModal();return false}
   if(r.status===401){$('#auth').showModal();return false}
-  alert('No se pudo verificar tu cuenta. Inténtalo de nuevo.');return false}
+  let j={};try{j=await r.json()}catch(e){}
+  alert('No se pudo verificar tu cuenta (código '+r.status+'). '+(j.detail||j.error||'Inténtalo de nuevo.'));return false}
 const doAuth=async up=>{const m=$('#aMsg'),e=$('#aMail').value.trim(),p=$('#aPass').value;
   if(!sb){m.textContent=window.supabase?'Falta configurar Supabase al inicio del script.':'No se cargó la librería de cuentas. Revisa tu conexión, desactiva bloqueadores para este sitio y recarga la página.';return}
   if(!e||p.length<6){m.textContent='Escribe un correo y una contraseña de mínimo 6 caracteres.';return}
