@@ -9,6 +9,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
@@ -27,6 +28,7 @@
 <style>
 @media print{body *{visibility:hidden}#cv,#cv *{visibility:visible}#cv{position:absolute;left:0;top:0;width:100%;box-shadow:none!important}}
 [hidden]{display:none!important}
+.grp>.xb{display:none}.grp:hover>.xb,.grp:focus-within>.xb{display:block}
 dialog::backdrop{background:rgba(18,59,54,.55)}
 #cv{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;line-height:1.45}
 </style>
@@ -100,7 +102,7 @@ dialog::backdrop{background:rgba(18,59,54,.55)}
 <!-- PDF -->
 <section id="t-pdf" hidden>
   <h2 class="mb-4 font-d text-2xl font-bold text-ink">Utilidades PDF</h2>
-  <div class="grid gap-5 xl:grid-cols-3">
+  <div class="grid gap-5 xl:grid-cols-2">
     <div class="card space-y-3"><h2 class="font-d text-lg font-semibold">Unir PDFs</h2>
       <input id="mFiles" type="file" accept="application/pdf" multiple class="inp">
       <ol id="mList" class="list-decimal pl-5 text-sm text-slate-600"></ol>
@@ -110,19 +112,34 @@ dialog::backdrop{background:rgba(18,59,54,.55)}
       <input id="cFile" type="file" accept="application/pdf" class="inp">
       <button class="btn" id="cGo">Optimizar y descargar</button><p id="cS" class="text-sm text-slate-600"></p>
       <p class="text-xs text-slate-500">Reescribe el PDF con estructura optimizada y quita metadatos. Funciona mejor en PDFs con mucho texto; no recomprime imágenes.</p></div>
-
-    <div class="card space-y-3"><h2 class="font-d text-lg font-semibold">Firmar o estampar imagen</h2>
-      <div><label class="lbl">PDF</label><input id="sFile" type="file" accept="application/pdf" class="inp"></div>
-      <div><label class="lbl">Imagen (PNG/JPG) o dibuja tu firma abajo</label><input id="sImg" type="file" accept="image/png,image/jpeg" class="inp"></div>
-      <canvas id="pad" width="320" height="110" class="w-full touch-none rounded-md border border-dashed border-slate-400 bg-white"></canvas>
-      <button type="button" class="text-xs text-slate-600 underline" id="padClr">Borrar firma</button>
-      <div class="grid grid-cols-3 gap-2">
-        <div><label class="lbl">Página</label><input id="sPg" type="number" min="1" value="1" class="inp"></div>
-        <div><label class="lbl">Posición</label><select id="sPos" class="inp"><option value="br">Abajo der.</option><option value="bl">Abajo izq.</option><option value="c">Centro</option></select></div>
-        <div><label class="lbl">Ancho (pt)</label><input id="sW" type="number" min="30" value="140" class="inp"></div>
-      </div>
-      <button class="btn" id="sGo">Estampar y descargar</button><p id="sS" class="text-sm text-slate-600"></p>
-      <p class="text-xs text-slate-500">Es una firma visual simple, sin validez de firma electrónica certificada.</p></div>
+  </div>
+  <div id="edCard" class="card relative mt-5">
+    <h3 class="font-d text-lg font-semibold">Editor visual de PDF</h3>
+    <p class="text-sm text-slate-600">Abre un PDF, tapa un texto con “Tapar y reemplazar” y escribe el nuevo valor, o agrega tu firma. Todo ocurre en tu navegador.</p>
+    <div class="mt-3 flex flex-wrap items-center gap-2">
+      <input id="edFile" type="file" accept="application/pdf" class="inp !w-auto">
+      <button type="button" id="edPatch" class="btn2" disabled>Tapar y reemplazar</button>
+      <button type="button" id="edSign" class="btn2" disabled>Añadir firma</button>
+      <button type="button" id="edDl" class="btn" disabled>Descargar PDF</button>
+    </div>
+    <p id="edS" class="mt-2 text-sm text-slate-600" role="status"></p>
+    <div id="fbar" hidden class="absolute z-20 flex items-center gap-1 rounded-md border border-slate-300 bg-white p-1 shadow-lg" style="pointer-events:auto">
+      <select id="fbFam" class="rounded border border-slate-300 px-1 text-xs" aria-label="Tipografía"><option value="Helvetica">Helvetica / Arial</option><option value="Times">Times New Roman</option><option value="Courier">Courier</option></select>
+      <input id="fbSize" type="number" min="4" max="200" class="w-14 rounded border border-slate-300 px-1 text-xs" aria-label="Tamaño en puntos">
+      <input id="fbCol" type="color" class="h-6 w-7" aria-label="Color del texto">
+      <button id="fbB" type="button" class="rounded border border-slate-300 px-2 text-xs font-bold" aria-label="Negrita">B</button>
+    </div>
+    <div id="edBox" class="relative mt-3 max-h-[75vh] overflow-auto rounded-md bg-slate-200 p-3"></div>
+    <dialog id="sigM" class="w-[min(94vw,460px)] rounded-xl p-6 shadow-2xl">
+      <div class="flex items-start justify-between"><h3 class="font-d text-xl font-bold text-ink">Añadir firma</h3><button type="button" class="text-2xl leading-none text-slate-500" aria-label="Cerrar" onclick="this.closest('dialog').close()">×</button></div>
+      <p class="mt-2 text-sm text-slate-600">Dibuja tu firma con el mouse o el dedo:</p>
+      <canvas id="sigPad" width="400" height="160" class="mt-1 w-full touch-none rounded-md border border-dashed border-slate-400" style="background:repeating-conic-gradient(#f1f5f9 0 25%,#fff 0 50%) 0 0/16px 16px"></canvas>
+      <button type="button" id="sigClr" class="text-xs text-slate-600 underline">Borrar</button>
+      <p class="mt-3 text-sm text-slate-600">O sube una imagen PNG sin fondo:</p>
+      <input id="sigFile" type="file" accept="image/png" class="inp">
+      <button type="button" id="sigOk" class="btn mt-4 w-full">Insertar firma</button>
+      <p id="sigMsg" class="mt-2 text-sm text-red-700" role="status"></p>
+    </dialog>
   </div>
 </section>
 
@@ -418,24 +435,149 @@ $('#cGo').onclick=async()=>{const f=$('#cFile').files[0],s=$('#cS');if(!f){s.tex
     if(b.length>=f.size){s.textContent=`Este PDF ya está optimizado (${kb(f.size)}). No se generó una versión más pesada.`;return}
     if(!await gate()){s.textContent='';return}save(b,f.name.replace(/\.pdf$/i,'')+'-optimizado.pdf');s.textContent=`De ${kb(f.size)} a ${kb(b.length)} (−${Math.round((1-b.length/f.size)*100)}%).`}
   catch(e){s.textContent='No se pudo leer el archivo.'}};
-/* Firma dibujada */
-const pad=$('#pad'),px=pad.getContext('2d');let drawing=false,inked=false;
-px.lineWidth=2.5;px.lineCap='round';px.strokeStyle='#123B36';
-const pos=e=>{const r=pad.getBoundingClientRect();return[(e.clientX-r.left)*pad.width/r.width,(e.clientY-r.top)*pad.height/r.height]};
-pad.onpointerdown=e=>{drawing=true;inked=true;pad.setPointerCapture(e.pointerId);px.beginPath();px.moveTo(...pos(e))};
-pad.onpointermove=e=>{if(drawing){px.lineTo(...pos(e));px.stroke()}};
-pad.onpointerup=()=>drawing=false;
-$('#padClr').onclick=()=>{px.clearRect(0,0,pad.width,pad.height);inked=false};
-$('#sGo').onclick=async()=>{const f=$('#sFile').files[0],im=$('#sImg').files[0],s=$('#sS');
-  if(!f){s.textContent='Elige un PDF.';return}if(!im&&!inked){s.textContent='Sube una imagen o dibuja tu firma.';return}
-  try{const d=await PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});
-    let img;if(im){const ab=await im.arrayBuffer();img=im.type==='image/png'?await d.embedPng(ab):await d.embedJpg(ab)}
-    else img=await d.embedPng(await (await fetch(pad.toDataURL('image/png'))).arrayBuffer());
-    const n=Math.min(Math.max(+$('#sPg').value||1,1),d.getPageCount()),pg=d.getPage(n-1),{width:W,height:H}=pg.getSize();
-    const w=+$('#sW').value||140,h=w*img.height/img.width,p=$('#sPos').value;
-    const x=p==='bl'?36:p==='c'?(W-w)/2:W-w-36,y=p==='c'?(H-h)/2:36;
-    pg.drawImage(img,{x,y,width:w,height:h});const outB=await d.save();if(!await gate()){s.textContent='';return}save(outB,f.name.replace(/\.pdf$/i,'')+'-firmado.pdf');s.textContent=`Imagen estampada en la página ${n}.`}
-  catch(e){s.textContent='No se pudo procesar. Verifica que el PDF y la imagen sean válidos.'}};
+/* ===== Editor visual de PDF (PDF.js para ver, pdf-lib para exportar) ===== */
+const {StandardFonts,rgb}=PDFLib;
+const S=1.5; // escala de render: 1 punto PDF = 1.5 px
+const FAM={Helvetica:'Arial,Helvetica,sans-serif',Times:'"Times New Roman",Times,serif',Courier:'"Courier New",Courier,monospace'};
+const ED={bytes:null,name:'',pages:[],items:[],mode:'',sel:null};
+if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const hex=a=>'#'+a.map(v=>v.toString(16).padStart(2,'0')).join(''),unhex=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
+const edMsg=t=>$('#edS').textContent=t;
+$('#edFile').onchange=async e=>{const f=e.target.files[0];if(!f)return;
+  if(!await session()){$('#auth').showModal();e.target.value='';return}
+  if(!window.pdfjsLib){edMsg('No se cargó PDF.js. Recarga la página.');return}
+  try{edMsg('Cargando…');ED.bytes=new Uint8Array(await f.arrayBuffer());ED.name=f.name;await renderDoc()}
+  catch(err){edMsg('No se pudo abrir el PDF (¿está protegido o dañado?).')}};
+async function renderDoc(){
+  const doc=await pdfjsLib.getDocument({data:ED.bytes.slice()}).promise,box=$('#edBox'),n=Math.min(doc.numPages,40);
+  $('#fbar').hidden=true;$('#edCard').appendChild($('#fbar'));
+  box.innerHTML='';ED.pages=[];ED.items=[];ED.sel=null;setMode('');
+  for(let i=1;i<=n;i++){
+    const page=await doc.getPage(i),vp=page.getViewport({scale:S}),w=document.createElement('div');
+    w.className='relative mx-auto mb-3 bg-white shadow';w.style.cssText=`width:${Math.floor(vp.width)}px;height:${Math.floor(vp.height)}px`;
+    const cv=document.createElement('canvas');cv.width=Math.floor(vp.width);cv.height=Math.floor(vp.height);cv.style.display='block';
+    const ov=document.createElement('div');ov.style.cssText='position:absolute;inset:0;pointer-events:none';
+    w.append(cv,ov);box.appendChild(w);
+    await page.render({canvasContext:cv.getContext('2d',{willReadFrequently:true}),viewport:vp}).promise;
+    const P={page,vp,cv,ov,w};ED.pages.push(P);ov.onpointerdown=e=>drawRect(e,P);
+  }
+  ['#edPatch','#edSign','#edDl'].forEach(q=>$(q).disabled=false);
+  edMsg(`${n} página(s) cargadas`+(doc.numPages>n?` (se muestran las primeras ${n})`:'')+'. Elige “Tapar y reemplazar” y arrastra un rectángulo sobre el texto.');
+}
+function setMode(m){ED.mode=ED.mode===m?'':m;
+  $('#edPatch').style.cssText=ED.mode==='patch'?'background:#123B36;color:#fff':'';
+  ED.pages.forEach(P=>{P.ov.style.pointerEvents=ED.mode==='patch'?'auto':'none';P.ov.style.cursor=ED.mode==='patch'?'crosshair':'default';P.ov.style.touchAction=ED.mode==='patch'?'none':'auto'})}
+$('#edPatch').onclick=()=>setMode('patch');
+
+/* Herramienta 1: tapar y reemplazar con cuentagotas */
+function drawRect(e,P){
+  if(ED.mode!=='patch'||e.target!==P.ov)return;
+  const ov=P.ov,r=ov.getBoundingClientRect(),x0=e.clientX-r.left,y0=e.clientY-r.top,t=document.createElement('div');
+  t.style.cssText='position:absolute;border:1.5px dashed #F2A93B;background:rgba(242,169,59,.15)';ov.appendChild(t);ov.setPointerCapture(e.pointerId);
+  const box=ev=>{const x=ev.clientX-r.left,y=ev.clientY-r.top;return{x:Math.min(x,x0),y:Math.min(y,y0),w:Math.abs(x-x0),h:Math.abs(y-y0)}};
+  const mv=ev=>{const b=box(ev);Object.assign(t.style,{left:b.x+'px',top:b.y+'px',width:b.w+'px',height:b.h+'px'})};
+  const up=ev=>{ov.removeEventListener('pointermove',mv);ov.removeEventListener('pointerup',up);t.remove();const b=box(ev);if(b.w>6&&b.h>6)addPatch(P,b.x,b.y,b.w,b.h)};
+  ov.addEventListener('pointermove',mv);ov.addEventListener('pointerup',up)}
+function sample(P,x,y,w,h){ // mediana de los píxeles justo fuera del borde del rectángulo
+  const c=P.cv.getContext('2d',{willReadFrequently:true}),W=P.cv.width,H=P.cv.height,m=3,v=[[],[],[]];
+  const cl=(a,lo,hi)=>Math.max(lo,Math.min(hi,Math.round(a)));
+  const strip=(a,b,cw,ch)=>{a=cl(a,0,W-1);b=cl(b,0,H-1);cw=Math.max(1,Math.min(Math.round(cw),W-a));ch=Math.max(1,Math.min(Math.round(ch),H-b));
+    const d=c.getImageData(a,b,cw,ch).data;for(let i=0;i<d.length;i+=4){v[0].push(d[i]);v[1].push(d[i+1]);v[2].push(d[i+2])}};
+  strip(x-m,y-m,w+2*m,1);strip(x-m,y+h+m,w+2*m,1);strip(x-m,y-m,1,h+2*m);strip(x+w+m,y-m,1,h+2*m);
+  return v.map(a=>{a.sort((p,q)=>p-q);return a[a.length>>1]})}
+function textColor(P,x,y,w,h,bg){ // el píxel más distinto del fondo = color del texto original
+  try{const X=Math.max(0,Math.round(x)),Y=Math.max(0,Math.round(y)),W=Math.max(1,Math.min(P.cv.width-X,Math.round(w))),H=Math.max(1,Math.min(P.cv.height-Y,Math.round(h)));
+    const d=P.cv.getContext('2d',{willReadFrequently:true}).getImageData(X,Y,W,H).data;let best=0,col=[0,0,0];
+    for(let i=0;i<d.length;i+=4){const k=Math.abs(d[i]-bg[0])+Math.abs(d[i+1]-bg[1])+Math.abs(d[i+2]-bg[2]);if(k>best){best=k;col=[d[i],d[i+1],d[i+2]]}}
+    return best>120?col:[0,0,0]}catch(e){return[0,0,0]}}
+/* Herramienta 2 (plus): detectar texto, tamaño y estilo con getTextContent() */
+async function detect(P,x,y,w,h){
+  try{const tc=await P.page.getTextContent(),a=P.vp.convertToPdfPoint(x,y+h),b=P.vp.convertToPdfPoint(x+w,y);
+    const hit=tc.items.filter(it=>it.str.trim()&&it.transform[4]<b[0]&&it.transform[4]+it.width>a[0]&&it.transform[5]<b[1]&&it.transform[5]+it.height>a[1]).sort((p,q)=>p.transform[4]-q.transform[4]);
+    if(!hit.length)return null;const it=hit[0],st=tc.styles[it.fontName]||{};let nm='';
+    try{nm=P.page.commonObjs.get(it.fontName).name||''}catch(e){}
+    const k=(nm+' '+(st.fontFamily||'')).toLowerCase();
+    return{text:hit.map(i=>i.str).join('').trim(),size:Math.round(Math.hypot(it.transform[0],it.transform[1])*10)/10||12,
+      fam:/courier|mono|consolas/.test(k)?'Courier':(/times|serif|georgia|garamond|minion|cambria/.test(k)&&!/sans/.test(k))?'Times':'Helvetica',bold:/bold|black|heavy/.test(k)}}
+  catch(e){return null}}
+async function addPatch(P,x,y,w,h){
+  const bg=sample(P,x,y,w,h),d=await detect(P,x,y,w,h)||{text:'',size:Math.max(8,Math.round(h/S*.8)),fam:'Helvetica',bold:false};
+  const it={t:'patch',P,x,y,w,h,col:bg,txt:d.text,size:d.size,fam:d.fam,bold:d.bold,tc:textColor(P,x,y,w,h,bg)};
+  ED.items.push(it);mkPatch(it);it.inp.focus();it.inp.select();
+  edMsg(d.text?`Texto detectado: “${d.text}”. Escribe el nuevo valor.`:'Parche creado. Escribe el nuevo texto.')}
+const xbtn=fn=>{const b=document.createElement('button');b.type='button';b.className='xb';b.textContent='×';b.setAttribute('aria-label','Quitar');
+  b.style.cssText='position:absolute;right:-9px;top:-9px;width:18px;height:18px;border-radius:9px;background:#c0392b;color:#fff;font-size:12px;line-height:18px;border:0;cursor:pointer;z-index:5';b.onclick=fn;return b};
+const styl=it=>Object.assign(it.inp.style,{fontSize:it.size*S+'px',fontFamily:FAM[it.fam],fontWeight:it.bold?700:400,color:`rgb(${it.tc})`});
+function mkPatch(it){
+  const d=document.createElement('div'),i=document.createElement('input');d.className='grp';
+  d.style.cssText=`position:absolute;pointer-events:auto;left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px;background:rgb(${it.col})`;
+  i.value=it.txt;i.setAttribute('aria-label','Nuevo texto');i.style.cssText='width:100%;height:100%;border:0;background:transparent;padding:0 2px;outline:1px dashed rgba(18,59,54,.35);box-sizing:border-box';
+  d.append(i,xbtn(()=>delItem(it)));it.el=d;it.inp=i;styl(it);it.P.ov.appendChild(d);
+  i.oninput=()=>it.txt=i.value;i.onfocus=()=>showBar(it)}
+function delItem(it){it.el.remove();ED.items=ED.items.filter(x=>x!==it);if(ED.sel===it){$('#fbar').hidden=true;ED.sel=null}}
+/* Barra flotante de tipografía */
+function showBar(it){ED.sel=it;const b=$('#fbar');it.P.ov.appendChild(b);
+  b.style.left=Math.max(0,it.x)+'px';b.style.top=(it.y>44?it.y-42:it.y+it.h+6)+'px';
+  $('#fbFam').value=it.fam;$('#fbSize').value=it.size;$('#fbCol').value=hex(it.tc);$('#fbB').style.background=it.bold?'#e2e8f0':'';b.hidden=false}
+$('#fbFam').onchange=e=>{if(ED.sel){ED.sel.fam=e.target.value;styl(ED.sel)}};
+$('#fbSize').oninput=e=>{if(ED.sel){ED.sel.size=Math.max(4,+e.target.value||12);styl(ED.sel)}};
+$('#fbCol').oninput=e=>{if(ED.sel){ED.sel.tc=unhex(e.target.value);styl(ED.sel)}};
+$('#fbB').onclick=()=>{if(ED.sel){ED.sel.bold=!ED.sel.bold;$('#fbB').style.background=ED.sel.bold?'#e2e8f0':'';styl(ED.sel)}};
+document.addEventListener('pointerdown',e=>{if(ED.sel&&!e.target.closest('#fbar')&&!(ED.sel.el&&ED.sel.el.contains(e.target))){$('#fbar').hidden=true;ED.sel=null}});
+
+/* Herramienta 3: firma (dibujar o subir PNG) arrastrable y redimensionable */
+const sp=$('#sigPad'),sx=sp.getContext('2d',{willReadFrequently:true});let sDraw=false,sInk=false;
+sx.lineWidth=3;sx.lineCap='round';sx.strokeStyle='#111';
+const sPos=e=>{const r=sp.getBoundingClientRect();return[(e.clientX-r.left)*sp.width/r.width,(e.clientY-r.top)*sp.height/r.height]};
+sp.onpointerdown=e=>{sDraw=sInk=true;sp.setPointerCapture(e.pointerId);sx.beginPath();sx.moveTo(...sPos(e))};
+sp.onpointermove=e=>{if(sDraw){sx.lineTo(...sPos(e));sx.stroke()}};sp.onpointerup=()=>sDraw=false;
+$('#sigClr').onclick=()=>{sx.clearRect(0,0,sp.width,sp.height);sInk=false};
+$('#edSign').onclick=()=>{$('#sigMsg').textContent='';$('#sigM').showModal()};
+function cropPad(){const W=sp.width,H=sp.height,d=sx.getImageData(0,0,W,H).data;let x0=W,y0=H,x1=0,y1=0;
+  for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(d[(y*W+x)*4+3]>10){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
+  const c=document.createElement('canvas');c.width=x1-x0+9;c.height=y1-y0+9;c.getContext('2d').drawImage(sp,x0-4,y0-4,c.width,c.height,0,0,c.width,c.height);return c.toDataURL('image/png')}
+$('#sigOk').onclick=async()=>{const f=$('#sigFile').files[0],m=$('#sigMsg');let src;
+  if(f){if(f.type!=='image/png'){m.textContent='Sube una imagen PNG.';return}src=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)})}
+  else if(sInk)src=cropPad();else{m.textContent='Dibuja tu firma o sube un PNG.';return}
+  addSign(src);$('#sigM').close();$('#sigFile').value='';$('#sigClr').click()};
+function addSign(src){
+  const b=$('#edBox'),P=ED.pages.find(p=>p.w.offsetTop+p.w.offsetHeight>b.scrollTop+20)||ED.pages[0];if(!P)return;
+  const im=new Image();im.onload=()=>{const w=Math.min(180,P.cv.width-20),h=w*im.height/im.width;
+    const it={t:'sign',P,src,w,h,x:(P.cv.width-w)/2,y:Math.max(10,Math.min(P.cv.height-h-10,b.scrollTop-P.w.offsetTop+40))};ED.items.push(it);mkSign(it)};im.src=src}
+function mkSign(it){
+  const d=document.createElement('div'),g=document.createElement('img'),hd=document.createElement('div');d.className='grp';d.tabIndex=0;
+  d.style.cssText=`position:absolute;pointer-events:auto;touch-action:none;cursor:move;outline:1px dashed rgba(18,59,54,.5);left:${it.x}px;top:${it.y}px;width:${it.w}px;height:${it.h}px`;
+  g.src=it.src;g.draggable=false;g.style.cssText='width:100%;height:100%;pointer-events:none;display:block';
+  hd.dataset.rs=1;hd.style.cssText='position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;background:#F2A93B;border:1px solid #123B36;cursor:nwse-resize';
+  d.append(g,hd,xbtn(()=>delItem(it)));it.el=d;it.P.ov.appendChild(d);
+  d.onpointerdown=e=>{if(e.target.closest('.xb'))return;const rs=e.target.dataset.rs,sx0=e.clientX,sy0=e.clientY,ox=it.x,oy=it.y,ow=it.w,oh=it.h;d.focus();d.setPointerCapture(e.pointerId);
+    const mv=ev=>{const dx=ev.clientX-sx0,dy=ev.clientY-sy0;
+      if(rs){it.w=Math.max(30,Math.min(it.P.cv.width-it.x,ow+dx));it.h=it.w*oh/ow}
+      else{it.x=Math.max(0,Math.min(it.P.cv.width-it.w,ox+dx));it.y=Math.max(0,Math.min(it.P.cv.height-it.h,oy+dy))}
+      Object.assign(d.style,{left:it.x+'px',top:it.y+'px',width:it.w+'px',height:it.h+'px'})};
+    const up=()=>{d.removeEventListener('pointermove',mv);d.removeEventListener('pointerup',up)};
+    d.addEventListener('pointermove',mv);d.addEventListener('pointerup',up);e.preventDefault()}}
+
+/* Descargar: pdf-lib estampa parches, textos y firmas en sus coordenadas exactas */
+$('#edDl').onclick=async()=>{
+  if(!ED.bytes)return;if(!ED.items.length){edMsg('Aún no hiciste cambios: tapa un texto o agrega una firma.');return}
+  try{edMsg('Preparando el PDF…');
+    const d=await PDFDocument.load(ED.bytes.slice(),{ignoreEncryption:true}),F={},NAMES={Helvetica:['Helvetica','HelveticaBold'],Times:['TimesRoman','TimesRomanBold'],Courier:['Courier','CourierBold']};
+    const fnt=async(fam,b)=>{const k=fam+b;return F[k]||(F[k]=await d.embedFont(StandardFonts[NAMES[fam][b?1:0]]))};
+    const safe=(t,f)=>[...t].filter(ch=>{try{f.encodeText(ch);return true}catch(e){return false}}).join('');
+    for(const it of ED.items){
+      const pg=d.getPage(ED.pages.indexOf(it.P)),H=pg.getHeight();
+      if(it.t==='patch'){
+        pg.drawRectangle({x:it.x/S,y:H-(it.y+it.h)/S,width:it.w/S,height:it.h/S,color:rgb(...it.col.map(v=>v/255))});
+        if(it.txt.trim()){const f=await fnt(it.fam,it.bold);
+          pg.drawText(safe(it.txt,f),{x:(it.x+2)/S,y:H-(it.y+it.h/2)/S-it.size*.3,size:it.size,font:f,color:rgb(...it.tc.map(v=>v/255))})}
+      }else{
+        const im=it.src.startsWith('data:image/png')?await d.embedPng(it.src):await d.embedJpg(it.src);
+        pg.drawImage(im,{x:it.x/S,y:H-(it.y+it.h)/S,width:it.w/S,height:it.h/S})}}
+    const out=await d.save();
+    if(!await gate()){edMsg('');return}
+    save(out,(ED.name||'documento').replace(/\.pdf$/i,'')+'-editado.pdf');edMsg('Listo: tu PDF editado se descargó.')}
+  catch(err){console.log(err);edMsg('No se pudo generar el PDF editado.')}};
 
 /* Organizador (simulación) */
 const RULES=[
