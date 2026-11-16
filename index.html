@@ -436,7 +436,7 @@ $('#cGo').onclick=async()=>{const f=$('#cFile').files[0],s=$('#cS');if(!f){s.tex
     if(!await gate()){s.textContent='';return}save(b,f.name.replace(/\.pdf$/i,'')+'-optimizado.pdf');s.textContent=`De ${kb(f.size)} a ${kb(b.length)} (−${Math.round((1-b.length/f.size)*100)}%).`}
   catch(e){s.textContent='No se pudo leer el archivo.'}};
 /* ===== Editor visual de PDF (PDF.js para ver, pdf-lib para exportar) ===== */
-const {StandardFonts,rgb}=PDFLib;
+const {StandardFonts,rgb,degrees}=PDFLib;
 const S=1.5; // escala de render: 1 punto PDF = 1.5 px
 const FAM={Helvetica:'Arial,Helvetica,sans-serif',Times:'"Times New Roman",Times,serif',Courier:'"Courier New",Courier,monospace'};
 const ED={bytes:null,name:'',pages:[],items:[],mode:'',sel:null};
@@ -466,6 +466,7 @@ async function renderDoc(){
 }
 function setMode(m){ED.mode=ED.mode===m?'':m;
   $('#edPatch').style.cssText=ED.mode==='patch'?'background:#123B36;color:#fff':'';
+  $('#edPatch').textContent=ED.mode==='patch'?'Dibujando parche… (clic para cancelar)':'Tapar y reemplazar';
   ED.pages.forEach(P=>{P.ov.style.pointerEvents=ED.mode==='patch'?'auto':'none';P.ov.style.cursor=ED.mode==='patch'?'crosshair':'default';P.ov.style.touchAction=ED.mode==='patch'?'none':'auto'})}
 $('#edPatch').onclick=()=>setMode('patch');
 
@@ -476,7 +477,7 @@ function drawRect(e,P){
   t.style.cssText='position:absolute;border:1.5px dashed #F2A93B;background:rgba(242,169,59,.15)';ov.appendChild(t);ov.setPointerCapture(e.pointerId);
   const box=ev=>{const x=ev.clientX-r.left,y=ev.clientY-r.top;return{x:Math.min(x,x0),y:Math.min(y,y0),w:Math.abs(x-x0),h:Math.abs(y-y0)}};
   const mv=ev=>{const b=box(ev);Object.assign(t.style,{left:b.x+'px',top:b.y+'px',width:b.w+'px',height:b.h+'px'})};
-  const up=ev=>{ov.removeEventListener('pointermove',mv);ov.removeEventListener('pointerup',up);t.remove();const b=box(ev);if(b.w>6&&b.h>6)addPatch(P,b.x,b.y,b.w,b.h)};
+  const up=ev=>{ov.removeEventListener('pointermove',mv);ov.removeEventListener('pointerup',up);t.remove();const b=box(ev);if(b.w>6&&b.h>6){addPatch(P,b.x,b.y,b.w,b.h);setMode('')}};
   ov.addEventListener('pointermove',mv);ov.addEventListener('pointerup',up)}
 function sample(P,x,y,w,h){ // mediana de los píxeles justo fuera del borde del rectángulo
   const c=P.cv.getContext('2d',{willReadFrequently:true}),W=P.cv.width,H=P.cv.height,m=3,v=[[],[],[]];
@@ -529,15 +530,19 @@ document.addEventListener('pointerdown',e=>{if(ED.sel&&!e.target.closest('#fbar'
 const sp=$('#sigPad'),sx=sp.getContext('2d',{willReadFrequently:true});let sDraw=false,sInk=false;
 sx.lineWidth=3;sx.lineCap='round';sx.strokeStyle='#111';
 const sPos=e=>{const r=sp.getBoundingClientRect();return[(e.clientX-r.left)*sp.width/r.width,(e.clientY-r.top)*sp.height/r.height]};
-sp.onpointerdown=e=>{sDraw=sInk=true;sp.setPointerCapture(e.pointerId);sx.beginPath();sx.moveTo(...sPos(e))};
+sp.onpointerdown=e=>{$('#sigFile').value='';sDraw=sInk=true;sp.setPointerCapture(e.pointerId);sx.beginPath();sx.moveTo(...sPos(e))};
 sp.onpointermove=e=>{if(sDraw){sx.lineTo(...sPos(e));sx.stroke()}};sp.onpointerup=()=>sDraw=false;
-$('#sigClr').onclick=()=>{sx.clearRect(0,0,sp.width,sp.height);sInk=false};
+$('#sigClr').onclick=()=>{sx.clearRect(0,0,sp.width,sp.height);sInk=false;$('#sigFile').value=''};
+$('#sigFile').onchange=()=>{if($('#sigFile').files[0]){sx.clearRect(0,0,sp.width,sp.height);sInk=false}};
+const shrink=src=>new Promise((ok,no)=>{const im=new Image();im.onload=()=>{if(im.width<=600)return ok(src);
+  const c=document.createElement('canvas');c.width=600;c.height=Math.max(1,Math.round(im.height*600/im.width));
+  const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/png'))};im.onerror=()=>no(new Error('img'));im.src=src});
 $('#edSign').onclick=()=>{$('#sigMsg').textContent='';$('#sigM').showModal()};
 function cropPad(){const W=sp.width,H=sp.height,d=sx.getImageData(0,0,W,H).data;let x0=W,y0=H,x1=0,y1=0;
   for(let y=0;y<H;y++)for(let x=0;x<W;x++)if(d[(y*W+x)*4+3]>10){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y)}
   const c=document.createElement('canvas');c.width=x1-x0+9;c.height=y1-y0+9;c.getContext('2d').drawImage(sp,x0-4,y0-4,c.width,c.height,0,0,c.width,c.height);return c.toDataURL('image/png')}
 $('#sigOk').onclick=async()=>{const f=$('#sigFile').files[0],m=$('#sigMsg');let src;
-  if(f){if(f.type!=='image/png'){m.textContent='Sube una imagen PNG.';return}src=await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)})}
+  if(f){if(f.type!=='image/png'){m.textContent='Sube una imagen PNG.';return}try{src=await shrink(await new Promise(r=>{const fr=new FileReader();fr.onload=()=>r(fr.result);fr.readAsDataURL(f)}))}catch(e){m.textContent='No se pudo leer la imagen.';return}}
   else if(sInk)src=cropPad();else{m.textContent='Dibuja tu firma o sube un PNG.';return}
   addSign(src);$('#sigM').close();$('#sigFile').value='';$('#sigClr').click()};
 function addSign(src){
@@ -566,14 +571,19 @@ $('#edDl').onclick=async()=>{
     const fnt=async(fam,b)=>{const k=fam+b;return F[k]||(F[k]=await d.embedFont(StandardFonts[NAMES[fam][b?1:0]]))};
     const safe=(t,f)=>[...t].filter(ch=>{try{f.encodeText(ch);return true}catch(e){return false}}).join('');
     for(const it of ED.items){
-      const pg=d.getPage(ED.pages.indexOf(it.P)),H=pg.getHeight();
+      const pg=d.getPage(ED.pages.indexOf(it.P)),R=((pg.getRotation().angle%360)+360)%360,rot=degrees(R);
+      // píxeles de pantalla (ya con la rotación de la página) -> coordenadas del PDF
+      const pt=(px,py)=>it.P.vp.convertToPdfPoint(px,py);
+      const [ax,ay]=pt(it.x,it.y+it.h); // esquina inferior izquierda tal como se ve en pantalla
       if(it.t==='patch'){
-        pg.drawRectangle({x:it.x/S,y:H-(it.y+it.h)/S,width:it.w/S,height:it.h/S,color:rgb(...it.col.map(v=>v/255))});
-        if(it.txt.trim()){const f=await fnt(it.fam,it.bold);
-          pg.drawText(safe(it.txt,f),{x:(it.x+2)/S,y:H-(it.y+it.h/2)/S-it.size*.3,size:it.size,font:f,color:rgb(...it.tc.map(v=>v/255))})}
+        pg.drawRectangle({x:ax,y:ay,width:it.w/S,height:it.h/S,color:rgb(...it.col.map(v=>v/255)),rotate:rot});
+        if(it.txt.trim()){const f=await fnt(it.fam,it.bold),rh=it.h/S;
+          // línea base = base del parche + (alto del parche - 0.72 × tamaño) / 2
+          const [tx,ty]=pt(it.x+2,it.y+it.h-((rh-it.size*.72)/2)*S);
+          pg.drawText(safe(it.txt,f),{x:tx,y:ty,size:it.size,font:f,color:rgb(...it.tc.map(v=>v/255)),rotate:rot})}
       }else{
         const im=it.src.startsWith('data:image/png')?await d.embedPng(it.src):await d.embedJpg(it.src);
-        pg.drawImage(im,{x:it.x/S,y:H-(it.y+it.h)/S,width:it.w/S,height:it.h/S})}}
+        pg.drawImage(im,{x:ax,y:ay,width:it.w/S,height:it.h/S,rotate:rot})}}
     const out=await d.save();
     if(!await gate()){edMsg('');return}
     save(out,(ED.name||'documento').replace(/\.pdf$/i,'')+'-editado.pdf');edMsg('Listo: tu PDF editado se descargó.')}
