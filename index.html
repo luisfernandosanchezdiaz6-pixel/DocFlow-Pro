@@ -85,7 +85,7 @@ dialog::backdrop{background:rgba(18,59,54,.55)}
     </form>
     <div class="lg:sticky lg:top-4 lg:self-start">
       <div class="mb-3" role="group" aria-label="Formato de CV"><p class="lbl">Formato de CV</p>
-        <div class="grid grid-cols-3 gap-2"><button type="button" class="tpl on" data-tpl="classic">Clásico / Ejecutivo</button><button type="button" class="tpl" data-tpl="modern">Moderno a dos columnas</button><button type="button" class="tpl" data-tpl="min">Minimalista / ATS</button></div>
+        <div id="tplBox" class="grid grid-cols-2 gap-2 sm:grid-cols-3"></div>
         <p id="tplD" class="mt-1 text-xs text-slate-500"></p></div>
       <div class="mb-3 flex flex-wrap gap-2">
         <button class="btn" id="dlCv">Descargar CV en PDF</button>
@@ -334,32 +334,59 @@ function lists(){
   $('#expL').innerHTML=cv.exp.map((x,i)=>`<div class="space-y-2 rounded-md border border-slate-200 p-3"><div class="grid grid-cols-2 gap-2">${fld('exp',i,'role','Cargo',x)}${fld('exp',i,'co','Empresa',x)}</div>${fld('exp',i,'per','Periodo (ej. 2022 – 2025)',x)}<textarea class="inp" rows="3" placeholder="Logros y responsabilidades" data-l="exp" data-i="${i}" data-k="desc">${esc(x.desc)}</textarea><button type="button" class="text-xs text-red-700 underline" data-rm="exp" data-i="${i}">Quitar</button></div>`).join('');
   $('#eduL').innerHTML=cv.edu.map((x,i)=>`<div class="space-y-2 rounded-md border border-slate-200 p-3"><div class="grid grid-cols-2 gap-2">${fld('edu',i,'deg','Título o programa',x)}${fld('edu',i,'inst','Institución',x)}</div>${fld('edu',i,'per','Periodo',x)}<button type="button" class="text-xs text-red-700 underline" data-rm="edu" data-i="${i}">Quitar</button></div>`).join('');
 }
-const T={classic:{f:'Georgia,"Times New Roman",serif',c:'#1F2A44'},modern:{f:'Arial,Helvetica,sans-serif',c:'#0F766E'},min:{f:'Arial,Helvetica,sans-serif',c:'#111'}};
-const TD={classic:'Una columna, títulos en azul marino con línea divisoria y encabezado centrado. Sobrio y formal.',modern:'Barra lateral con contacto, habilidades y educación. En el texto del PDF el contenido principal va primero.',min:'Una columna sin color ni líneas, con tipografía simple. La opción más segura para ATS.'};
+const SER='Georgia,"Times New Roman",serif',SAN='Arial,Helvetica,sans-serif';
+/* l: one | left | right (barra lateral) · hd: cabecera · sh: estilo de títulos · dt:'left' = fechas a la izquierda · a: compatibilidad ATS */
+const TPLS={
+ classic:{n:'Clásico / Ejecutivo',f:SER,c:'#1F2A44',l:'one',hd:'center',sh:'upper',a:'alta',d:'Una columna, encabezado centrado y títulos en azul marino con línea divisoria. Sobrio y formal.'},
+ modern:{n:'Moderno a dos columnas',f:SAN,c:'#0F766E',l:'left',sb:'#EEF5F4',st:'#111',hd:'left',sh:'bar',a:'media',d:'Barra lateral clara con contacto, habilidades y educación.'},
+ min:{n:'Minimalista / ATS',f:SAN,c:'#111',l:'one',hd:'left',sh:'plain',a:'máxima',d:'Una columna sin color ni líneas, con tipografía simple.'},
+ elegante:{n:'Elegante',f:SER,c:'#5C6B57',l:'one',hd:'soft',sh:'thin',a:'alta',d:'Nombre amplio y ligero, con títulos espaciados en verde suave.'},
+ banda:{n:'Cabecera de color',f:SAN,c:'#1F2A44',l:'one',hd:'band',ht:'#fff',sh:'bar',a:'alta',d:'Cabecera en bloque de color con el nombre en blanco.'},
+ pastel:{n:'Suave pastel',f:SAN,c:'#7C3AED',l:'one',hd:'band',bg:'#EDE3FA',ht:'#3B1F4A',sh:'pill',a:'alta',d:'Cabecera pastel y títulos en etiquetas de color.'},
+ crono:{n:'Cronológico',f:SAN,c:'#2B6CB0',l:'one',hd:'left',sh:'line',dt:'left',a:'alta',d:'Fechas en una columna a la izquierda y el detalle a la derecha.'},
+ oscuro:{n:'Barra lateral oscura',f:SAN,c:'#263238',l:'left',sb:'#263238',st:'#fff',hd:'left',sh:'bar',a:'media',d:'Barra lateral oscura con texto blanco a la izquierda.'},
+ derecha:{n:'Barra lateral derecha',f:SAN,c:'#2C5282',l:'right',sb:'#EEF2F7',st:'#111',hd:'left',sh:'upper',a:'media',d:'Contenido principal a la izquierda y barra lateral clara a la derecha.'},
+ violeta:{n:'Moderno violeta',f:SAN,c:'#6B2D8B',l:'left',sb:'#6B2D8B',st:'#fff',hd:'left',sh:'upper',a:'media',d:'Barra lateral violeta y títulos con línea.'},
+ rojo:{n:'Bloque rojo',f:SAN,c:'#C0392B',l:'left',sb:'#C0392B',st:'#fff',hd:'bold',sh:'plain',a:'media',d:'Barra lateral roja y nombre en mayúsculas con una franja de color.'}
+};
 let tpl='classic';
 function prev(){
-  const c=cv,{f,c:ac}=T[tpl];
-  const s=(t,b)=>{const st={classic:`font-size:13px;font-weight:700;color:${ac};text-transform:uppercase;letter-spacing:.06em;border-bottom:1.5px solid ${ac};margin:14px 0 6px;padding-bottom:2px`,modern:`font-size:13px;font-weight:700;color:${ac};border-left:4px solid ${ac};padding-left:6px;margin:14px 0 6px`,min:'font-size:13px;font-weight:700;margin:12px 0 4px'}[tpl];return `<h2 style="${st}">${t}</h2>${b}`};
+  const c=cv,T=TPLS[tpl],ac=T.c,side=T.l!=='one';
+  const hs=col=>({
+    upper:`font-size:12.5px;font-weight:700;color:${col};text-transform:uppercase;letter-spacing:.08em;border-bottom:1.5px solid ${col};margin:14px 0 6px;padding-bottom:2px`,
+    bar:`font-size:13px;font-weight:700;color:${col};border-left:4px solid ${col};padding-left:6px;margin:14px 0 6px`,
+    plain:'font-size:13px;font-weight:700;margin:12px 0 4px',
+    thin:`font-size:11.5px;font-weight:600;color:${col};text-transform:uppercase;letter-spacing:.2em;margin:16px 0 6px`,
+    pill:`display:inline-block;font-size:11.5px;font-weight:700;color:#fff;background:${col};padding:2px 12px;border-radius:99px;margin:14px 0 6px`,
+    line:`font-size:15px;font-weight:700;color:${col};margin:14px 0 6px;padding-bottom:3px;border-bottom:1px solid #ccc`}[T.sh]);
+  const sec=(t,b,col)=>`<h2 style="${hs(col||ac)}">${t}</h2>${b}`;
   const row='display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 8px';
+  const item=(l,r,d)=>T.dt==='left'
+    ?`<div style="display:grid;grid-template-columns:26% 1fr;gap:10px;margin-bottom:8px"><div style="font-size:11px;color:#555">${r}</div><div><b>${l}</b>${d?`<div>${d}</div>`:''}</div></div>`
+    :`<div style="margin-bottom:8px"><div style="${row}"><b>${l}</b><span>${r}</span></div>${d?`<div>${d}</div>`:''}</div>`;
   const cl=[c.email,c.phone,c.city,c.link].filter(Boolean).map(esc);
-  const ex=c.exp.filter(x=>x.role||x.co).map(x=>`<div style="margin-bottom:8px"><div style="${row}"><b>${esc(x.role)}${x.co?' – '+esc(x.co):''}</b><span>${esc(x.per)}</span></div><div>${esc(x.desc).replace(/\n/g,'<br>')}</div></div>`).join('');
-  const ed=c.edu.filter(x=>x.deg||x.inst).map(x=>`<div style="${row};margin-bottom:4px"><span><b>${esc(x.deg)}</b>${x.inst?' – '+esc(x.inst):''}</span><span>${esc(x.per)}</span></div>`).join('');
+  const ex=c.exp.filter(x=>x.role||x.co).map(x=>item(`${esc(x.role)}${x.co?' – '+esc(x.co):''}`,esc(x.per),esc(x.desc).replace(/\n/g,'<br>'))).join('');
+  const ed=c.edu.filter(x=>x.deg||x.inst).map(x=>item(`${esc(x.deg)}${x.inst?' – '+esc(x.inst):''}`,esc(x.per),'')).join('');
   const skl=c.skills.split(',').map(x=>x.trim()).filter(Boolean).map(esc);
-  const sum=c.summary?s('Perfil profesional',`<p style="margin:0">${esc(c.summary)}</p>`):'';
-  const exs=ex?s('Experiencia laboral',ex):'',eds=ed?s('Educación',ed):'';
-  const sk=skl.length?s('Habilidades',`<p style="margin:0">${skl.join(tpl==='min'?', ':' • ')}</p>`):'';
+  const sum=c.summary?sec('Perfil profesional',`<p style="margin:0">${esc(c.summary)}</p>`):'';
+  const exs=ex?sec('Experiencia laboral',ex):'',eds=ed?sec('Educación',ed):'';
+  const sk=skl.length?sec('Habilidades',`<p style="margin:0">${skl.join(tpl==='min'?', ':' • ')}</p>`):'';
   const nm=esc(c.name)||'Tu nombre',tt=esc(c.title)||'Cargo profesional';
+  const hdr=ct=>{const line=ct?`<div style="font-size:11px;color:#444;margin-top:4px">${ct}</div>`:'';return({
+    center:`<div style="text-align:center"><h1 style="font-size:26px;font-weight:700;margin:0;color:${ac}">${nm}</h1><div style="font-size:14px">${tt}</div>${line}</div>`,
+    soft:`<div style="text-align:center"><h1 style="font-size:28px;font-weight:400;letter-spacing:.14em;margin:0;color:${ac}">${nm}</h1><div style="font-size:13px;letter-spacing:.1em;margin-top:2px">${tt}</div>${line}</div>`,
+    left:`<h1 style="font-size:26px;font-weight:700;margin:0;color:${ac}">${nm}</h1><div style="font-size:14px;color:#333">${tt}</div>${line}`,
+    bold:`<h1 style="font-size:28px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;margin:0;color:${ac}">${nm}</h1><div style="font-size:14px;letter-spacing:.06em">${tt}</div><div style="height:4px;background:${ac};margin:8px 0 2px"></div>${line}`,
+    band:`<div style="background:${T.bg||ac};color:${T.ht};padding:16px 20px;border-radius:4px"><h1 style="font-size:26px;font-weight:700;margin:0">${nm}</h1><div style="font-size:14px">${tt}</div>${ct?`<div style="font-size:11px;margin-top:4px">${ct}</div>`:''}</div>`}[T.hd])};
   let h;
-  if(tpl==='modern'){
-    h=`<div style="display:grid;grid-template-columns:31% 1fr;gap:20px"><div><h1 style="font-size:26px;font-weight:700;margin:0;color:${ac}">${nm}</h1><div style="font-size:14px;color:#333">${tt}</div>${sum}${exs}</div><div style="order:-1;align-self:start;background:#EEF5F4;padding:4px 14px 14px;border-radius:4px">${cl.length?s('Contacto',cl.map(x=>`<div style="word-break:break-word;margin-bottom:3px">${x}</div>`).join('')):''}${skl.length?s('Habilidades',skl.map(x=>`<div style="margin-bottom:2px">${x}</div>`).join('')):''}${eds}</div></div>`;
-  }else if(tpl==='min'){
-    h=`<h1 style="font-size:22px;font-weight:700;margin:0">${nm}</h1><div style="font-size:14px">${tt}</div><div style="font-size:11px;color:#444;margin-top:3px">${cl.join(' | ')}</div>${sum}${exs}${eds}${sk}`;
-  }else{
-    h=`<div style="text-align:center"><h1 style="font-size:26px;font-weight:700;margin:0;color:${ac}">${nm}</h1><div style="font-size:14px">${tt}</div><div style="font-size:11px;color:#444;margin-top:4px">${cl.join(' | ')}</div></div>${sum}${exs}${eds}${sk}`;
+  if(!side){h=hdr(cl.join(' | '))+sum+exs+eds+sk}
+  else{
+    const sb=`<div style="order:${T.l==='left'?-1:1};align-self:stretch;background:${T.sb};color:${T.st};padding:4px 14px 14px;border-radius:4px">${cl.length?sec('Contacto',cl.map(x=>`<div style="word-break:break-word;margin-bottom:3px">${x}</div>`).join(''),T.st):''}${skl.length?sec('Habilidades',skl.map(x=>`<div style="margin-bottom:2px">${x}</div>`).join(''),T.st):''}${ed?sec('Educación',ed,T.st):''}</div>`;
+    h=`<div style="display:grid;grid-template-columns:${T.l==='left'?'31% 1fr':'1fr 31%'};gap:20px"><div>${hdr('')}${sum}${exs}</div>${sb}</div>`;
   }
-  const cvEl=$('#cv');cvEl.style.fontFamily=f;
-  cvEl.innerHTML=h;
-  $('#tplD').textContent=TD[tpl];
+  const cvEl=$('#cv');cvEl.style.fontFamily=T.f;cvEl.innerHTML=h;
+  if(!$('#tplBox').children.length)$('#tplBox').innerHTML=Object.entries(TPLS).map(([k,v])=>`<button type="button" class="tpl${k===tpl?' on':''}" data-tpl="${k}">${v.n}</button>`).join('');
+  $('#tplD').textContent=`${T.d} Compatibilidad con ATS: ${T.a}.`;
 }
 document.addEventListener('input',e=>{const t=e.target;
   if(t.dataset.l)cv[t.dataset.l][t.dataset.i][t.dataset.k]=t.value;
