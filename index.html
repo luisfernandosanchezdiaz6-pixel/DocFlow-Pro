@@ -1,0 +1,440 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>DocFlow Pro – CV, utilidades PDF y organizador de documentos</title>
+<meta name="description" content="Crea tu hoja de vida, edita PDFs y organiza tus documentos desde el navegador. Tus archivos no salen de tu equipo.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com/3.4.17"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>tailwind.config={theme:{extend:{colors:{ink:'#123B36',sun:'#F2A93B',paper:'#F4F6F5'},fontFamily:{d:['Bricolage Grotesque','sans-serif'],b:['Instrument Sans','system-ui','sans-serif']}}}}</script>
+<style type="text/tailwindcss">
+.inp{@apply w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sun}
+.btn{@apply inline-flex items-center justify-center rounded-md bg-ink px-4 py-2 text-sm font-semibold text-white hover:bg-[#0b2825] focus-visible:outline focus-visible:outline-2 focus-visible:outline-sun disabled:opacity-50}
+.btn2{@apply inline-flex items-center justify-center rounded-md border border-ink bg-white px-4 py-2 text-sm font-semibold text-ink hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sun}
+.card{@apply rounded-xl border border-slate-200 bg-white p-5}
+.nav{@apply w-full whitespace-nowrap rounded-md px-3 py-2 text-left text-sm text-white/80 hover:bg-white/10}
+.nav.on{@apply bg-white/15 font-semibold text-white}
+.lbl{@apply mb-1 block text-xs font-medium text-slate-600}
+.tpl{@apply rounded-md border border-slate-300 bg-white px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sun}
+.tpl.on{@apply border-ink bg-ink text-white}
+</style>
+<style>
+@media print{body *{visibility:hidden}#cv,#cv *{visibility:visible}#cv{position:absolute;left:0;top:0;width:100%;box-shadow:none!important}}
+[hidden]{display:none!important}
+dialog::backdrop{background:rgba(18,59,54,.55)}
+#cv{font-family:Arial,Helvetica,sans-serif;color:#111;font-size:12.5px;line-height:1.45}
+</style>
+</head>
+<body class="bg-paper font-b text-slate-800">
+<div class="flex min-h-screen flex-col md:flex-row">
+
+<aside class="bg-ink p-4 md:sticky md:top-0 md:h-screen md:w-60 md:shrink-0">
+  <div class="mb-4 font-d text-xl font-bold text-white">DocFlow <span class="text-sun">Pro</span></div>
+  <nav class="flex gap-1 overflow-x-auto md:flex-col" aria-label="Herramientas">
+    <button class="nav on" data-tab="cv">Creador de CV</button>
+    <button class="nav" data-tab="pdf">Utilidades PDF</button>
+    <button class="nav" data-tab="ai">Organizador con IA</button>
+  </nav>
+  <button class="mt-4 hidden w-full rounded-md bg-sun px-3 py-2 text-sm font-semibold text-ink md:block" data-plans>Planes y precios</button>
+</aside>
+
+<div class="flex min-w-0 flex-1 flex-col">
+<header class="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-3">
+  <p class="text-sm text-slate-600">Todo se procesa en tu navegador. Tus archivos no se suben a ningún servidor.</p>
+  <div class="flex shrink-0 flex-wrap items-center justify-end gap-2"><span id="acct" class="text-xs text-slate-600"></span><button id="authBtn" type="button" class="btn2">Iniciar sesión</button><button class="rounded-md bg-sun px-4 py-2 text-sm font-semibold text-ink shadow-sm hover:brightness-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ink" data-plans>Planes y precios</button></div>
+</header>
+
+<main class="flex-1 p-5">
+
+<div class="mb-6 max-w-3xl">
+  <h1 class="font-d text-3xl font-bold text-ink">DocFlow Pro: crea tu hoja de vida, edita PDFs y organiza tus documentos</h1>
+  <p class="mt-2 text-slate-600">Tres herramientas en un solo lugar, directamente en tu navegador. Tus archivos no se suben a ningún servidor. Empieza gratis y pasa a un plan de pago cuando lo necesites.</p>
+  <a href="#precios" class="mt-3 inline-block text-sm font-semibold text-ink underline">Ver precios y planes</a>
+</div>
+
+<!-- CV STUDIO -->
+<section id="t-cv">
+  <h2 class="mb-4 font-d text-2xl font-bold text-ink">Creador de hojas de vida</h2>
+  <div class="grid gap-5 lg:grid-cols-2">
+    <form id="cvForm" class="space-y-4" onsubmit="return false">
+      <div class="card space-y-3">
+        <h2 class="font-d text-lg font-semibold">Datos personales</h2>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="lbl">Nombre completo</label><input class="inp" data-k="name"></div>
+          <div><label class="lbl">Cargo o título</label><input class="inp" data-k="title"></div>
+          <div><label class="lbl">Correo</label><input class="inp" type="email" data-k="email"></div>
+          <div><label class="lbl">Teléfono</label><input class="inp" data-k="phone"></div>
+          <div><label class="lbl">Ciudad</label><input class="inp" data-k="city"></div>
+          <div><label class="lbl">LinkedIn o portafolio</label><input class="inp" data-k="link"></div>
+        </div>
+      </div>
+      <div class="card"><h2 class="mb-2 font-d text-lg font-semibold">Perfil profesional</h2>
+        <textarea class="inp" rows="4" data-k="summary" placeholder="Resume en 3 o 4 líneas quién eres y qué sabes hacer"></textarea></div>
+      <div class="card space-y-3"><h2 class="font-d text-lg font-semibold">Experiencia laboral</h2><div id="expL" class="space-y-3"></div>
+        <button type="button" class="btn2" data-add="exp">Agregar experiencia</button></div>
+      <div class="card space-y-3"><h2 class="font-d text-lg font-semibold">Educación</h2><div id="eduL" class="space-y-3"></div>
+        <button type="button" class="btn2" data-add="edu">Agregar estudio</button></div>
+      <div class="card"><h2 class="mb-2 font-d text-lg font-semibold">Habilidades</h2>
+        <input class="inp" data-k="skills" placeholder="Separadas por coma: Excel, Atención al cliente, Inglés B2"></div>
+    </form>
+    <div class="lg:sticky lg:top-4 lg:self-start">
+      <div class="mb-3" role="group" aria-label="Formato de CV"><p class="lbl">Formato de CV</p>
+        <div class="grid grid-cols-3 gap-2"><button type="button" class="tpl on" data-tpl="classic">Clásico / Ejecutivo</button><button type="button" class="tpl" data-tpl="modern">Moderno a dos columnas</button><button type="button" class="tpl" data-tpl="min">Minimalista / ATS</button></div>
+        <p id="tplD" class="mt-1 text-xs text-slate-500"></p></div>
+      <div class="mb-3 flex flex-wrap gap-2">
+        <button class="btn" id="dlCv">Descargar CV en PDF</button>
+        <button class="btn2" id="prCv" title="Genera un PDF con texto seleccionable, mejor para sistemas ATS">Imprimir / PDF con texto</button>
+      </div>
+      <div class="overflow-auto rounded-md shadow-lg ring-1 ring-slate-300"><div id="cv" class="min-h-[560px] bg-white p-8"></div></div>
+      <p class="mt-2 text-xs text-slate-500">“Descargar CV en PDF” exporta el diseño exacto como imagen. Para máxima compatibilidad con ATS usa “Imprimir / PDF con texto”.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PDF -->
+<section id="t-pdf" hidden>
+  <h2 class="mb-4 font-d text-2xl font-bold text-ink">Utilidades PDF</h2>
+  <div class="grid gap-5 xl:grid-cols-3">
+    <div class="card space-y-3"><h2 class="font-d text-lg font-semibold">Unir PDFs</h2>
+      <input id="mFiles" type="file" accept="application/pdf" multiple class="inp">
+      <ol id="mList" class="list-decimal pl-5 text-sm text-slate-600"></ol>
+      <button class="btn" id="mGo">Unir y descargar</button><p id="mS" class="text-sm text-slate-600"></p></div>
+
+    <div class="card space-y-3"><h2 class="font-d text-lg font-semibold">Reducir peso</h2>
+      <input id="cFile" type="file" accept="application/pdf" class="inp">
+      <button class="btn" id="cGo">Optimizar y descargar</button><p id="cS" class="text-sm text-slate-600"></p>
+      <p class="text-xs text-slate-500">Reescribe el PDF con estructura optimizada y quita metadatos. Funciona mejor en PDFs con mucho texto; no recomprime imágenes.</p></div>
+
+    <div class="card space-y-3"><h2 class="font-d text-lg font-semibold">Firmar o estampar imagen</h2>
+      <div><label class="lbl">PDF</label><input id="sFile" type="file" accept="application/pdf" class="inp"></div>
+      <div><label class="lbl">Imagen (PNG/JPG) o dibuja tu firma abajo</label><input id="sImg" type="file" accept="image/png,image/jpeg" class="inp"></div>
+      <canvas id="pad" width="320" height="110" class="w-full touch-none rounded-md border border-dashed border-slate-400 bg-white"></canvas>
+      <button type="button" class="text-xs text-slate-600 underline" id="padClr">Borrar firma</button>
+      <div class="grid grid-cols-3 gap-2">
+        <div><label class="lbl">Página</label><input id="sPg" type="number" min="1" value="1" class="inp"></div>
+        <div><label class="lbl">Posición</label><select id="sPos" class="inp"><option value="br">Abajo der.</option><option value="bl">Abajo izq.</option><option value="c">Centro</option></select></div>
+        <div><label class="lbl">Ancho (pt)</label><input id="sW" type="number" min="30" value="140" class="inp"></div>
+      </div>
+      <button class="btn" id="sGo">Estampar y descargar</button><p id="sS" class="text-sm text-slate-600"></p>
+      <p class="text-xs text-slate-500">Es una firma visual simple, sin validez de firma electrónica certificada.</p></div>
+  </div>
+</section>
+
+<!-- AI -->
+<section id="t-ai" hidden>
+  <h2 class="mb-1 font-d text-2xl font-bold text-ink">Organizador inteligente de documentos</h2>
+  <p class="mb-4 text-sm text-slate-600">Demostración: la clasificación se simula a partir del nombre del archivo. En Pro se conecta a lectura avanzada del contenido.</p>
+  <label id="drop" for="dFiles" class="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-ink/40 bg-white p-10 text-center hover:border-ink">
+    <span class="font-d text-lg font-semibold text-ink">Suelta aquí tus facturas, cartas, contratos o cédulas</span>
+    <span class="text-sm text-slate-500">PDF o imágenes. También puedes hacer clic para elegirlos.</span>
+    <input id="dFiles" type="file" accept="application/pdf,image/*" multiple class="sr-only">
+  </label>
+  <div id="docs" class="mt-5 space-y-2"></div>
+  <button id="zipGo" class="btn mt-4" hidden>Descargar organizado (.zip por carpetas)</button>
+</section>
+
+</main>
+
+<!-- ============================================================
+     CONFIGURACIÓN DE PAGOS (edita solo aquí):
+     · Wompi: cambia el href de cada botón "Pagar en Colombia" por el link de pago de ese plan.
+       Cada link de Wompi cobra un monto fijo: crea un link por plan.
+     · PayPal: el correo de la cuenta está en el campo name="business" de cada formulario.
+     ============================================================ -->
+<section id="precios" class="border-t border-slate-200 bg-white px-5 py-10" aria-labelledby="h-precios">
+  <div class="mx-auto max-w-5xl">
+    <h2 id="h-precios" class="font-d text-2xl font-bold text-ink">Precios y planes</h2>
+    <p class="mt-1 max-w-3xl text-sm text-slate-600">Tres planes mensuales con precios en dólares estadounidenses (USD). Desde cualquier país puedes suscribirte con PayPal en USD. En Colombia puedes pagar con PSE, Nequi o tarjeta a través de Wompi, que cobra en pesos colombianos (COP): $9.999 COP el plan Básico y $19.900 COP el plan Pro.</p>
+    <div class="mt-6 grid gap-4 lg:grid-cols-3">
+      <div class="flex flex-col rounded-xl border border-slate-200 p-6"><h3 class="font-d text-xl font-semibold">Gratis</h3>
+        <p class="my-2 text-4xl font-bold">$0 <span class="text-base font-normal text-slate-500">USD / mes</span></p>
+        <ul class="list-disc space-y-1.5 pl-5 text-sm text-slate-600"><li>3 PDFs gratis por cuenta (CV o utilidades)</li><li>Utilidades PDF básicas</li><li>Clasificación básica de documentos</li></ul>
+        <div class="mt-auto pt-5"><a href="#" class="btn2 w-full">Empezar gratis</a></div></div>
+      <div class="flex flex-col rounded-xl border border-slate-300 p-6"><h3 class="font-d text-xl font-semibold">Básico</h3>
+        <p class="my-2 text-4xl font-bold">$2.50 <span class="text-base font-normal text-slate-500">USD / mes</span></p>
+        <ul class="list-disc space-y-1.5 pl-5 text-sm text-slate-600"><li>Descargas de CV ilimitadas</li><li>Todos los formatos de CV disponibles</li><li>Utilidades PDF completas</li></ul>
+        <div class="mt-auto space-y-2 pt-5">
+          <a data-wompi href="https://checkout.wompi.co/l/Uh9FKX" target="_blank" rel="noopener" class="btn w-full">Pagar en Colombia: $9.999 COP</a>
+          <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank" rel="noopener">
+            <input type="hidden" name="cmd" value="_xclick-subscriptions">
+            <input type="hidden" name="business" value="luisfernandosanchezdiaz6@gmail.com">
+            <input type="hidden" name="item_name" value="DocFlow Pro - Plan Básico (mensual)">
+            <input type="hidden" name="currency_code" value="USD">
+            <input type="hidden" name="a3" value="2.50">
+            <input type="hidden" name="p3" value="1">
+            <input type="hidden" name="t3" value="M">
+            <input type="hidden" name="src" value="1">
+            <input type="hidden" name="no_note" value="1">
+            <input type="hidden" name="charset" value="utf-8">
+            <input type="hidden" name="custom" class="pp-custom" value="">
+            <input type="hidden" name="notify_url" value="https://docflowpro.netlify.app/.netlify/functions/paypal-ipn">
+            <input type="hidden" name="return" value="https://docflowpro.netlify.app/#precios">
+            <input type="hidden" name="cancel_return" value="https://docflowpro.netlify.app/#precios">
+            <button type="submit" class="btn2 w-full">Suscribirme con PayPal (USD)</button>
+          </form>
+        </div></div>
+      <div class="flex flex-col rounded-xl border-2 border-sun bg-amber-50/40 p-6"><h3 class="font-d text-xl font-semibold">Pro</h3>
+        <p class="my-2 text-4xl font-bold">$5 <span class="text-base font-normal text-slate-500">USD / mes</span></p>
+        <ul class="list-disc space-y-1.5 pl-5 text-sm text-slate-700"><li>Todo lo del plan Básico</li><li>Organizador inteligente con IA avanzada: lectura de contenido y detección de fechas y montos</li><li>Procesamiento por lotes</li><li>Soporte prioritario</li></ul>
+        <div class="mt-auto space-y-2 pt-5">
+          <a data-wompi href="https://checkout.wompi.co/l/NcYVCj" target="_blank" rel="noopener" class="btn w-full">Pagar en Colombia: $19.900 COP</a>
+          <form action="https://www.paypal.com/cgi-bin/webscr" method="post" target="_blank" rel="noopener">
+            <input type="hidden" name="cmd" value="_xclick-subscriptions">
+            <input type="hidden" name="business" value="luisfernandosanchezdiaz6@gmail.com">
+            <input type="hidden" name="item_name" value="DocFlow Pro - Plan Pro (mensual)">
+            <input type="hidden" name="currency_code" value="USD">
+            <input type="hidden" name="a3" value="5.00">
+            <input type="hidden" name="p3" value="1">
+            <input type="hidden" name="t3" value="M">
+            <input type="hidden" name="src" value="1">
+            <input type="hidden" name="no_note" value="1">
+            <input type="hidden" name="charset" value="utf-8">
+            <input type="hidden" name="custom" class="pp-custom" value="">
+            <input type="hidden" name="notify_url" value="https://docflowpro.netlify.app/.netlify/functions/paypal-ipn">
+            <input type="hidden" name="return" value="https://docflowpro.netlify.app/#precios">
+            <input type="hidden" name="cancel_return" value="https://docflowpro.netlify.app/#precios">
+            <button type="submit" class="btn2 w-full">Suscribirme con PayPal (USD)</button>
+          </form>
+        </div></div>
+    </div>
+    <div class="mt-4 rounded-xl border border-slate-200 p-5"><h3 class="font-d text-lg font-semibold">PDF adicional, sin suscripción</h3>
+      <p class="mt-1 text-sm text-slate-600">Cada cuenta incluye 3 PDFs gratis. Después puedes pagar solo por cada documento extra: $2.000 COP por PDF, con Wompi.</p>
+      <a data-wompi href="https://checkout.wompi.co/l/aNR79b" target="_blank" rel="noopener" class="btn mt-3">Pagar un PDF extra: $2.000 COP</a></div>
+  </div>
+</section>
+
+<footer class="border-t border-slate-200 bg-white px-5 py-6 text-sm">
+  <div class="mx-auto max-w-4xl space-y-2">
+    <details class="rounded-md border border-slate-200 p-3"><summary class="cursor-pointer font-semibold">Términos de Servicio</summary>
+      <div class="mt-2 space-y-2 text-slate-600"><p>Última actualización: 15 de noviembre de 2026.</p>
+      <p><b>1. Aceptación.</b> Al usar DocFlow Pro aceptas estos términos. Si no estás de acuerdo, no uses el servicio.</p>
+      <p><b>2. Servicio.</b> DocFlow Pro ofrece herramientas para crear hojas de vida, editar PDFs y organizar documentos. La mayor parte del procesamiento ocurre en tu navegador.</p>
+      <p><b>3. Planes y pagos.</b> Cada cuenta incluye 3 PDFs gratis; después puedes pagar $2.000 COP por cada PDF adicional o suscribirte. Los planes de pago (Básico y Pro) tienen una duración de un mes. Puedes pagar con Wompi (PSE, Nequi o tarjeta, en Colombia) o con PayPal (internacional). Los pagos con Wompi cubren un solo periodo mensual y se renuevan pagando de nuevo; las suscripciones de PayPal se renuevan automáticamente y puedes cancelarlas en cualquier momento desde tu cuenta de PayPal. DocFlow Pro no almacena datos de tarjetas ni de cuentas bancarias: los procesan Wompi y PayPal.</p>
+      <p><b>4. Uso aceptable.</b> No puedes usar el servicio para fines ilegales, para vulnerar derechos de terceros ni para intentar interrumpir su funcionamiento. Eres responsable de los documentos que procesas.</p>
+      <p><b>5. Propiedad.</b> Tus documentos siguen siendo tuyos. El software, la marca y el diseño de DocFlow Pro pertenecen a Fernando, quien opera DocFlow Pro desde Colombia.</p>
+      <p><b>6. Limitación de responsabilidad.</b> El servicio se ofrece “tal cual”. En la medida que permita la ley, no respondemos por pérdidas indirectas ni por el resultado de usar los documentos generados.</p>
+      <p><b>7. Cambios.</b> Podemos actualizar estos términos; publicaremos la nueva versión en esta página.</p>
+      <p><b>8. Contacto.</b> RADICAC@proton.me</p></div></details>
+    <details class="rounded-md border border-slate-200 p-3"><summary class="cursor-pointer font-semibold">Política de Privacidad</summary>
+      <div class="mt-2 space-y-2 text-slate-600"><p>Última actualización: 15 de noviembre de 2026.</p>
+      <p><b>Tus archivos.</b> Los PDFs, imágenes y datos del CV se procesan localmente en tu navegador. No los subimos ni los almacenamos en nuestros servidores.</p>
+      <p><b>Datos que recopilamos.</b> Si te suscribes, Wompi o PayPal, según el método que elijas, recopilan tu correo y los datos de pago para procesar la compra. Nosotros recibimos únicamente la información necesaria para activar tu plan. No almacenamos datos de tarjetas. Para tu cuenta guardamos tu correo, tu plan y el conteo de PDFs generados en Supabase; la contraseña se guarda cifrada.</p>
+      <p><b>Analítica y cookies.</b> Podemos usar analítica básica y anónima para mejorar el servicio. Puedes bloquearla desde tu navegador.</p>
+      <p><b>Tus derechos.</b> Puedes pedir acceso, corrección o eliminación de tus datos escribiendo a RADICAC@proton.me.</p>
+      <p><b>Responsable.</b> DocFlow Pro, operado por Fernando, Colombia.</p></div></details>
+    <details class="rounded-md border border-slate-200 p-3"><summary class="cursor-pointer font-semibold">Política de Reembolsos</summary>
+      <div class="mt-2 space-y-2 text-slate-600"><p>Última actualización: 15 de noviembre de 2026.</p>
+      <p>Si no estás satisfecho con tu suscripción (Básico o Pro), puedes pedir el reembolso completo dentro de los 14 días posteriores a tu primer pago, escribiendo a RADICAC@proton.me con el correo de tu compra.</p>
+      <p>Las renovaciones posteriores se pueden cancelar en cualquier momento; no se reembolsan periodos ya iniciados, salvo que la ley aplicable lo exija. Los reembolsos se devuelven al método de pago original a través de Wompi o PayPal, según el método que usaste, y pueden tardar varios días hábiles en reflejarse.</p></div></details>
+    <p class="pt-2 text-xs text-slate-500">Contacto: <a class="underline" href="mailto:RADICAC@proton.me">RADICAC@proton.me</a><br>© 2026 DocFlow Pro, operado por Fernando (Colombia). Pagos procesados por Wompi y PayPal.</p>
+  </div>
+</footer>
+</div>
+</div>
+
+
+
+<dialog id="auth" class="w-[min(92vw,380px)] rounded-xl p-6 shadow-2xl">
+  <div class="flex items-start justify-between"><h2 class="font-d text-xl font-bold text-ink">Tu cuenta</h2><button type="button" class="text-2xl leading-none text-slate-500" aria-label="Cerrar" onclick="this.closest('dialog').close()">×</button></div>
+  <p class="mt-1 text-sm text-slate-600">Necesitas una cuenta para generar documentos. Tienes 3 PDFs gratis.</p>
+  <div class="mt-3 space-y-2"><input id="aMail" type="email" class="inp" placeholder="Correo" autocomplete="email"><input id="aPass" type="password" class="inp" placeholder="Contraseña (mínimo 6 caracteres)" autocomplete="current-password"></div>
+  <div class="mt-3 flex gap-2"><button type="button" id="aIn" class="btn flex-1">Entrar</button><button type="button" id="aUp" class="btn2 flex-1">Crear cuenta</button></div>
+  <p id="aMsg" class="mt-2 text-sm text-slate-600" role="status"></p>
+</dialog>
+<dialog id="limit" class="w-[min(92vw,420px)] rounded-xl p-6 shadow-2xl">
+  <div class="flex items-start justify-between"><h2 class="font-d text-xl font-bold text-ink">Llegaste al límite gratuito</h2><button type="button" class="text-2xl leading-none text-slate-500" aria-label="Cerrar" onclick="this.closest('dialog').close()">×</button></div>
+  <p class="mt-1 text-sm text-slate-600">Ya usaste tus 3 PDFs gratis. Elige cómo seguir:</p>
+  <div class="mt-4 space-y-2">
+    <a data-wompi href="https://checkout.wompi.co/l/aNR79b" target="_blank" rel="noopener" class="btn w-full">Pagar este PDF: $2.000 COP</a>
+    <a href="#precios" class="btn2 w-full" onclick="this.closest('dialog').close()">Ver suscripciones</a>
+    <button type="button" id="limRef" class="w-full text-sm text-slate-600 underline">Ya pagué: actualizar mi saldo</button>
+  </div>
+  <p class="mt-3 text-xs text-slate-500">En Wompi usa el mismo correo de tu cuenta. El crédito aparece en unos segundos tras la aprobación.</p>
+</dialog>
+
+<script>
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const save=(bytes,name,type='application/pdf')=>{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([bytes],{type}));a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),4000)};
+const kb=n=>(n/1024).toFixed(1)+' KB';
+
+/* =====================================================================
+   CUENTAS (Supabase): pega aquí tus dos valores (ver instrucciones en la respuesta).
+   ===================================================================== */
+const SUPABASE_URL = 'https://xmqgbwcekbwmroibllkk.supabase.co'; // Supabase > Project Settings > API > Project URL
+const SUPABASE_ANON_KEY = 'sb_publishable_LywloH-MTKGu9_uTSUt6EA_SBabouPj'; // Clave publishable (pública, segura para el navegador)
+const FREE_LIMIT = 3; // PDFs gratis por cuenta (debe coincidir con supabase.sql)
+/* ===================================================================== */
+const sb=(window.supabase&&!SUPABASE_URL.startsWith('PEGAR_AQUI'))?supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY):null;
+let SES=null;
+const session=async()=>sb?(await sb.auth.getSession()).data.session:null;
+async function refresh(){
+  SES=await session();const a=$('#acct');
+  $$('.pp-custom').forEach(i=>i.value=SES?SES.user.id:'');
+  $('#authBtn').textContent=SES?'Salir':'Iniciar sesión';
+  if(!SES){a.textContent='';return}
+  const {data:p}=await sb.from('profiles').select('plan,plan_expires_at,free_used,extra_credits').single();
+  if(!p){a.textContent=SES.user.email;return}
+  const act=p.plan!=='free'&&new Date(p.plan_expires_at)>new Date();
+  a.textContent=SES.user.email+' · '+(act?`Plan ${p.plan==='pro'?'Pro':'Básico'} hasta ${new Date(p.plan_expires_at).toLocaleDateString('es-CO')}`:`${Math.max(0,FREE_LIMIT-p.free_used)} de ${FREE_LIMIT} PDFs gratis`+(p.extra_credits?` · ${p.extra_credits} extra`:''));
+}
+/* Puerta: el servidor descuenta el PDF (plan vigente, gratis o crédito extra) antes de entregarlo */
+async function gate(){
+  if(!sb){alert('Falta configurar Supabase al inicio del script.');return false}
+  const s=await session();
+  if(!s){$('#auth').showModal();return false}
+  let r;try{r=await fetch('/.netlify/functions/consume',{method:'POST',headers:{Authorization:'Bearer '+s.access_token}})}catch(e){alert('No hay conexión con el servidor.');return false}
+  if(r.ok){refresh();return true}
+  if(r.status===402){$('#limit').showModal();return false}
+  if(r.status===401){$('#auth').showModal();return false}
+  alert('No se pudo verificar tu cuenta. Inténtalo de nuevo.');return false}
+const doAuth=async up=>{const m=$('#aMsg'),e=$('#aMail').value.trim(),p=$('#aPass').value;
+  if(!sb){m.textContent='Falta configurar Supabase al inicio del script.';return}
+  if(!e||p.length<6){m.textContent='Escribe un correo y una contraseña de mínimo 6 caracteres.';return}
+  const r=up?await sb.auth.signUp({email:e,password:p}):await sb.auth.signInWithPassword({email:e,password:p});
+  if(r.error){m.textContent=r.error.message;return}
+  if(up&&!r.data.session){m.textContent='Cuenta creada. Confirma tu correo y luego inicia sesión.';return}
+  m.textContent='';$('#auth').close()};
+$('#aIn').onclick=()=>doAuth(false);$('#aUp').onclick=()=>doAuth(true);
+$('#authBtn').onclick=async()=>{if(!sb){alert('Falta configurar Supabase al inicio del script.');return}if(SES)await sb.auth.signOut();else $('#auth').showModal()};
+$('#limRef').onclick=async()=>{await refresh();$('#limit').close()};
+$$('[data-wompi]').forEach(a=>a.addEventListener('click',e=>{
+  if(!SES){e.preventDefault();$('#auth').showModal();return}
+  if(!confirm(`Al pagar en Wompi usa este mismo correo: ${SES.user.email}. Si usas otro, tu pago no se activará automáticamente.`))e.preventDefault()}));
+$$('#precios form').forEach(f=>f.addEventListener('submit',e=>{if(!SES){e.preventDefault();$('#auth').showModal()}}));
+if(sb)sb.auth.onAuthStateChange(()=>refresh());
+refresh();
+
+
+/* Navegación y modal */
+$$('[data-tab]').forEach(b=>b.onclick=()=>{$$('[data-tab]').forEach(x=>x.classList.toggle('on',x===b));['cv','pdf','ai'].forEach(t=>$('#t-'+t).hidden=t!==b.dataset.tab)});
+$$('[data-plans]').forEach(b=>b.onclick=()=>$('#precios').scrollIntoView({behavior:'smooth'}));
+
+/* CV */
+const cv={name:'',title:'',email:'',phone:'',city:'',link:'',summary:'',skills:'',exp:[{role:'',co:'',per:'',desc:''}],edu:[{deg:'',inst:'',per:''}]};
+const fld=(l,i,k,p,x)=>`<input class="inp" placeholder="${p}" value="${esc(x[k])}" data-l="${l}" data-i="${i}" data-k="${k}">`;
+function lists(){
+  $('#expL').innerHTML=cv.exp.map((x,i)=>`<div class="space-y-2 rounded-md border border-slate-200 p-3"><div class="grid grid-cols-2 gap-2">${fld('exp',i,'role','Cargo',x)}${fld('exp',i,'co','Empresa',x)}</div>${fld('exp',i,'per','Periodo (ej. 2022 – 2025)',x)}<textarea class="inp" rows="3" placeholder="Logros y responsabilidades" data-l="exp" data-i="${i}" data-k="desc">${esc(x.desc)}</textarea><button type="button" class="text-xs text-red-700 underline" data-rm="exp" data-i="${i}">Quitar</button></div>`).join('');
+  $('#eduL').innerHTML=cv.edu.map((x,i)=>`<div class="space-y-2 rounded-md border border-slate-200 p-3"><div class="grid grid-cols-2 gap-2">${fld('edu',i,'deg','Título o programa',x)}${fld('edu',i,'inst','Institución',x)}</div>${fld('edu',i,'per','Periodo',x)}<button type="button" class="text-xs text-red-700 underline" data-rm="edu" data-i="${i}">Quitar</button></div>`).join('');
+}
+const T={classic:{f:'Georgia,"Times New Roman",serif',c:'#1F2A44'},modern:{f:'Arial,Helvetica,sans-serif',c:'#0F766E'},min:{f:'Arial,Helvetica,sans-serif',c:'#111'}};
+const TD={classic:'Una columna, títulos en azul marino con línea divisoria y encabezado centrado. Sobrio y formal.',modern:'Barra lateral con contacto, habilidades y educación. En el texto del PDF el contenido principal va primero.',min:'Una columna sin color ni líneas, con tipografía simple. La opción más segura para ATS.'};
+let tpl='classic';
+function prev(){
+  const c=cv,{f,c:ac}=T[tpl];
+  const s=(t,b)=>{const st={classic:`font-size:13px;font-weight:700;color:${ac};text-transform:uppercase;letter-spacing:.06em;border-bottom:1.5px solid ${ac};margin:14px 0 6px;padding-bottom:2px`,modern:`font-size:13px;font-weight:700;color:${ac};border-left:4px solid ${ac};padding-left:6px;margin:14px 0 6px`,min:'font-size:13px;font-weight:700;margin:12px 0 4px'}[tpl];return `<h2 style="${st}">${t}</h2>${b}`};
+  const row='display:flex;flex-wrap:wrap;justify-content:space-between;gap:2px 8px';
+  const cl=[c.email,c.phone,c.city,c.link].filter(Boolean).map(esc);
+  const ex=c.exp.filter(x=>x.role||x.co).map(x=>`<div style="margin-bottom:8px"><div style="${row}"><b>${esc(x.role)}${x.co?' – '+esc(x.co):''}</b><span>${esc(x.per)}</span></div><div>${esc(x.desc).replace(/\n/g,'<br>')}</div></div>`).join('');
+  const ed=c.edu.filter(x=>x.deg||x.inst).map(x=>`<div style="${row};margin-bottom:4px"><span><b>${esc(x.deg)}</b>${x.inst?' – '+esc(x.inst):''}</span><span>${esc(x.per)}</span></div>`).join('');
+  const skl=c.skills.split(',').map(x=>x.trim()).filter(Boolean).map(esc);
+  const sum=c.summary?s('Perfil profesional',`<p style="margin:0">${esc(c.summary)}</p>`):'';
+  const exs=ex?s('Experiencia laboral',ex):'',eds=ed?s('Educación',ed):'';
+  const sk=skl.length?s('Habilidades',`<p style="margin:0">${skl.join(tpl==='min'?', ':' • ')}</p>`):'';
+  const nm=esc(c.name)||'Tu nombre',tt=esc(c.title)||'Cargo profesional';
+  let h;
+  if(tpl==='modern'){
+    h=`<div style="display:grid;grid-template-columns:31% 1fr;gap:20px"><div><h1 style="font-size:26px;font-weight:700;margin:0;color:${ac}">${nm}</h1><div style="font-size:14px;color:#333">${tt}</div>${sum}${exs}</div><div style="order:-1;align-self:start;background:#EEF5F4;padding:4px 14px 14px;border-radius:4px">${cl.length?s('Contacto',cl.map(x=>`<div style="word-break:break-word;margin-bottom:3px">${x}</div>`).join('')):''}${skl.length?s('Habilidades',skl.map(x=>`<div style="margin-bottom:2px">${x}</div>`).join('')):''}${eds}</div></div>`;
+  }else if(tpl==='min'){
+    h=`<h1 style="font-size:22px;font-weight:700;margin:0">${nm}</h1><div style="font-size:14px">${tt}</div><div style="font-size:11px;color:#444;margin-top:3px">${cl.join(' | ')}</div>${sum}${exs}${eds}${sk}`;
+  }else{
+    h=`<div style="text-align:center"><h1 style="font-size:26px;font-weight:700;margin:0;color:${ac}">${nm}</h1><div style="font-size:14px">${tt}</div><div style="font-size:11px;color:#444;margin-top:4px">${cl.join(' | ')}</div></div>${sum}${exs}${eds}${sk}`;
+  }
+  const cvEl=$('#cv');cvEl.style.fontFamily=f;
+  cvEl.innerHTML=h;
+  $('#tplD').textContent=TD[tpl];
+}
+document.addEventListener('input',e=>{const t=e.target;
+  if(t.dataset.l)cv[t.dataset.l][t.dataset.i][t.dataset.k]=t.value;
+  else if(t.dataset.k&&t.closest('#cvForm'))cv[t.dataset.k]=t.value;else return;prev()});
+document.addEventListener('click',e=>{const t=e.target;
+  if(t.dataset.tpl){tpl=t.dataset.tpl;$$('[data-tpl]').forEach(b=>b.classList.toggle('on',b===t));prev()}
+  if(t.dataset.add){cv[t.dataset.add].push(t.dataset.add==='exp'?{role:'',co:'',per:'',desc:''}:{deg:'',inst:'',per:''});lists()}
+  if(t.dataset.rm){cv[t.dataset.rm].splice(+t.dataset.i,1);lists();prev()}});
+$('#prCv').onclick=async()=>{if(await gate())window.print()};
+$('#dlCv').onclick=async()=>{if(!await gate())return;const b=$('#dlCv');b.disabled=true;b.textContent='Generando…';
+  const c=$('#cv').cloneNode(true);c.style.cssText+=';position:fixed;left:-9999px;top:0;width:794px;padding:44px;background:#fff;font-size:13px';document.body.appendChild(c);
+  try{await html2pdf().set({margin:0,filename:'CV-'+(cv.name||'hoja-de-vida').replace(/\s+/g,'-')+'.pdf',image:{type:'jpeg',quality:.98},html2canvas:{scale:2,useCORS:true},jsPDF:{unit:'mm',format:'a4'}}).from(c).save()}
+  catch(err){alert('No se pudo generar el PDF. Prueba con “Imprimir / PDF con texto”.')}
+  c.remove();b.disabled=false;b.textContent='Descargar CV en PDF'};
+lists();prev();
+
+/* Utilidades PDF */
+const {PDFDocument}=PDFLib;
+$('#mFiles').onchange=e=>$('#mList').innerHTML=[...e.target.files].map(f=>`<li>${esc(f.name)}</li>`).join('');
+$('#mGo').onclick=async()=>{const fs=[...$('#mFiles').files],s=$('#mS');if(fs.length<2){s.textContent='Elige al menos 2 PDFs.';return}
+  try{s.textContent='Uniendo…';const out=await PDFDocument.create();
+    for(const f of fs){const d=await PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});(await out.copyPages(d,d.getPageIndices())).forEach(p=>out.addPage(p))}
+    const b=await out.save();if(!await gate()){s.textContent='';return}save(b,'unido.pdf');s.textContent=`Listo: ${out.getPageCount()} páginas, ${kb(b.length)}.`}
+  catch(e){s.textContent='Alguno de los archivos no se pudo leer (¿está protegido o dañado?).'}};
+$('#cGo').onclick=async()=>{const f=$('#cFile').files[0],s=$('#cS');if(!f){s.textContent='Elige un PDF.';return}
+  try{s.textContent='Optimizando…';const d=await PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});
+    d.setTitle('');d.setAuthor('');d.setSubject('');d.setKeywords([]);d.setProducer('');d.setCreator('');
+    const b=await d.save({useObjectStreams:true});
+    if(b.length>=f.size){s.textContent=`Este PDF ya está optimizado (${kb(f.size)}). No se generó una versión más pesada.`;return}
+    if(!await gate()){s.textContent='';return}save(b,f.name.replace(/\.pdf$/i,'')+'-optimizado.pdf');s.textContent=`De ${kb(f.size)} a ${kb(b.length)} (−${Math.round((1-b.length/f.size)*100)}%).`}
+  catch(e){s.textContent='No se pudo leer el archivo.'}};
+/* Firma dibujada */
+const pad=$('#pad'),px=pad.getContext('2d');let drawing=false,inked=false;
+px.lineWidth=2.5;px.lineCap='round';px.strokeStyle='#123B36';
+const pos=e=>{const r=pad.getBoundingClientRect();return[(e.clientX-r.left)*pad.width/r.width,(e.clientY-r.top)*pad.height/r.height]};
+pad.onpointerdown=e=>{drawing=true;inked=true;pad.setPointerCapture(e.pointerId);px.beginPath();px.moveTo(...pos(e))};
+pad.onpointermove=e=>{if(drawing){px.lineTo(...pos(e));px.stroke()}};
+pad.onpointerup=()=>drawing=false;
+$('#padClr').onclick=()=>{px.clearRect(0,0,pad.width,pad.height);inked=false};
+$('#sGo').onclick=async()=>{const f=$('#sFile').files[0],im=$('#sImg').files[0],s=$('#sS');
+  if(!f){s.textContent='Elige un PDF.';return}if(!im&&!inked){s.textContent='Sube una imagen o dibuja tu firma.';return}
+  try{const d=await PDFDocument.load(await f.arrayBuffer(),{ignoreEncryption:true});
+    let img;if(im){const ab=await im.arrayBuffer();img=im.type==='image/png'?await d.embedPng(ab):await d.embedJpg(ab)}
+    else img=await d.embedPng(await (await fetch(pad.toDataURL('image/png'))).arrayBuffer());
+    const n=Math.min(Math.max(+$('#sPg').value||1,1),d.getPageCount()),pg=d.getPage(n-1),{width:W,height:H}=pg.getSize();
+    const w=+$('#sW').value||140,h=w*img.height/img.width,p=$('#sPos').value;
+    const x=p==='bl'?36:p==='c'?(W-w)/2:W-w-36,y=p==='c'?(H-h)/2:36;
+    pg.drawImage(img,{x,y,width:w,height:h});const outB=await d.save();if(!await gate()){s.textContent='';return}save(outB,f.name.replace(/\.pdf$/i,'')+'-firmado.pdf');s.textContent=`Imagen estampada en la página ${n}.`}
+  catch(e){s.textContent='No se pudo procesar. Verifica que el PDF y la imagen sean válidos.'}};
+
+/* Organizador (simulación) */
+const RULES=[
+ ['Finanzas',/factura|recibo|invoice|pago|extracto|banco|bancari|impuesto|boleta|cuenta/i],
+ ['Legal',/contrato|poder|demanda|escritura|acuerdo|legal|notar/i],
+ ['Laboral',/carta|laboral|certificad|hoja.?de.?vida|\bcv\b|empleo|oferta|trabajo|nomina|nómina/i],
+ ['Personal',/c[eé]dula|dni|pasaporte|identi|licencia|\brut\b|foto/i]];
+const norm=s=>s.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+const cap=s=>s.charAt(0).toUpperCase()+s.slice(1).toLowerCase();
+let docs=[];
+const analyze=f=>{let cat='Personal',kind='Documento',conf=55;
+  for(const [c,re] of RULES){const m=f.name.match(re);if(m){cat=c;kind=cap(norm(m[0]).replace(/\W+/g,''))||'Documento';conf=88+(f.name.length%11);break}}
+  const ext=(f.name.split('.').pop()||'pdf').toLowerCase(),d=new Date(f.lastModified).toISOString().slice(0,10);
+  return{file:f,cat,conf,name:`${cat}_${kind}_${d}.${ext}`,st:''}};
+function showDocs(){$('#docs').innerHTML=docs.map((d,i)=>`<div class="card flex flex-wrap items-center gap-3 !p-3">
+  <div class="min-w-0 flex-1"><p class="truncate text-sm font-medium">${esc(d.file.name)}</p><p class="text-xs text-slate-500">${d.st?esc(d.st):'Carpeta sugerida: <b>'+d.cat+'</b> · confianza '+d.conf+'%'}</p></div>
+  ${d.st?'':`<select class="inp !w-32" data-cat="${i}">${['Finanzas','Laboral','Legal','Personal'].map(c=>`<option${c===d.cat?' selected':''}>${c}</option>`).join('')}</select>
+  <input class="inp !w-64" value="${esc(d.name)}" data-nm="${i}" aria-label="Nombre sugerido">
+  <button class="btn2" data-one="${i}">Descargar</button>`}</div>`).join('')}
+document.addEventListener('input',e=>{if(e.target.dataset.nm!==undefined)docs[e.target.dataset.nm].name=e.target.value});
+document.addEventListener('change',e=>{if(e.target.dataset.cat!==undefined)docs[e.target.dataset.cat].cat=e.target.value});
+document.addEventListener('click',e=>{const i=e.target.dataset.one;if(i!==undefined){const d=docs[i];save(d.file,d.name,d.file.type)}});
+async function ingest(list){if(!await session()){$('#auth').showModal();return}const fs=[...list].filter(f=>/pdf|image/.test(f.type));if(!fs.length)return;
+  const start=docs.length;docs.push(...fs.map(analyze));$('#zipGo').hidden=true;
+  for(let i=start;i<docs.length;i++){
+    for(const m of ['Leyendo documento…','Extrayendo texto y datos clave…','Clasificando en carpeta…','Generando nombre sugerido…']){docs[i].st=m;showDocs();await sleep(450)}
+    docs[i].st=''}
+  showDocs();$('#zipGo').hidden=false}
+$('#dFiles').onchange=e=>ingest(e.target.files);
+const dz=$('#drop');
+['dragenter','dragover'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.add('border-sun','bg-amber-50')}));
+['dragleave','drop'].forEach(v=>dz.addEventListener(v,e=>{e.preventDefault();dz.classList.remove('border-sun','bg-amber-50')}));
+dz.addEventListener('drop',e=>ingest(e.dataTransfer.files));
+$('#zipGo').onclick=async()=>{const z=new JSZip(),used={};
+  docs.forEach(d=>{const p=d.cat+'/'+d.name;used[p]=(used[p]||0)+1;z.folder(d.cat).file(used[p]>1?d.name.replace(/(\.\w+)$/,`_${used[p]}$1`):d.name,d.file)});
+  save(await z.generateAsync({type:'blob'}),'documentos-organizados.zip','application/zip')};
+</script>
+</body>
+</html>
